@@ -25,24 +25,75 @@ import com.sun.net.httpserver.HttpsExchange;
 public class ServerChat {
 	
 	 private static HashMap<String, ArrayList> userList = new HashMap<>();
+	 
+	 public static void main(String[] args) throws Exception {
 
-	  //Test class
-	  public static class MyHandler implements HttpHandler {
-	    @Override
-	    public void handle(HttpExchange t) throws IOException {
-	      String response = "Welcome to the chat group server !";
-	      HttpsExchange httpsExchange = (HttpsExchange) t;
-	      t.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-	      t.sendResponseHeaders(200, response.getBytes().length);
-	      OutputStream os = t.getResponseBody();
+		    try {
+		      
+		      InetSocketAddress address = new InetSocketAddress(8090);
+
+		      
+		      HttpsServer httpsServer = HttpsServer.create(address, 0);
+		      SSLContext sslContext = SSLContext.getInstance("TLS");
+
+		      
+		      char[] password = "password".toCharArray();
+		      KeyStore ks = KeyStore.getInstance("JKS");
+		      FileInputStream fis = new FileInputStream("src/server.jks");
+		      ks.load(fis, password);
+
+		     
+		      KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+		      kmf.init(ks, password);
+
+		      
+		      TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
+		      tmf.init(ks);
+
+		      
+		      sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
 
 
-	      //write response
-	      os.write(response.getBytes());
-	      os.close();
-	    }
-	  }
+	           
+		      httpsServer.setHttpsConfigurator(new HttpsConfigurator(sslContext) {
+		        public void configure(HttpsParameters params) {
+		          try {
+		            
+		            SSLContext context = getSSLContext();
+		            SSLEngine engine = context.createSSLEngine();
+		            params.setNeedClientAuth(false);
+		            params.setCipherSuites(engine.getEnabledCipherSuites());
+		            params.setProtocols(engine.getEnabledProtocols());
 
+		            
+		            SSLParameters sslParameters = context.getSupportedSSLParameters();
+		            params.setSSLParameters(sslParameters);
+
+		          } catch (Exception ex) {
+		            System.out.println("Failed to create HTTPS port");
+		          }
+		        }
+		      });
+		      
+		      
+		      httpsServer.createContext("/showInbox", new getInbox());
+		      httpsServer.createContext("/listUsers", new List());
+		      httpsServer.createContext("/registerUser", new registerUser());
+		      httpsServer.createContext("/sendMessage", new sendMessages());
+		    
+		      httpsServer.start();
+		      System.out.println("server is started in the IP 127.0.0.1 with the port 8090");
+		      
+		      
+		    } catch (Exception exception) {
+		    	
+		      System.out.println("Failed to create HTTPS server on port " + 8090 + " of localhost");
+		      exception.printStackTrace();
+
+		    }
+		  }
+
+	 
 
 	  public static class registerUser implements HttpHandler {
 	    @Override
@@ -67,7 +118,7 @@ public class ServerChat {
 	      }
 
 	      System.out.println(response);
-	      // send response
+	      
 	      he.sendResponseHeaders(200, response.length());
 	      OutputStream os = he.getResponseBody();
 	      os.write(response.toString().getBytes());
@@ -77,7 +128,7 @@ public class ServerChat {
 	  }
 
 
-	  public static class listUsers implements HttpHandler {
+	  public static class List implements HttpHandler {
 	    @Override
 	    public void handle(HttpExchange he) throws IOException {
 	      
@@ -86,7 +137,7 @@ public class ServerChat {
 	      String query = requestedUri.getRawQuery();
 
 	      String clientName = query.substring(query.indexOf("=") + 1, query.length());
-	      System.out.println(clientName);
+	      //System.out.println(clientName);
 
 	     
 	      String response = "";
@@ -99,7 +150,7 @@ public class ServerChat {
 	        }
 	      }
 
-	      System.out.println(userList + "Sent");
+	      //System.out.println(userList + "Sent");
 	      
 	      he.sendResponseHeaders(200, response.length());
 	      OutputStream os = he.getResponseBody();
@@ -109,7 +160,7 @@ public class ServerChat {
 	    }
 	  }
 
-	  public static class getMyMessage implements HttpHandler {
+	  public static class getInbox implements HttpHandler {
 	    @Override
 	    public void handle(HttpExchange he) throws IOException {
 	      try {
@@ -132,7 +183,7 @@ public class ServerChat {
 	          }
 	        }
 
-	        //System.out.println(userList + "Sent");
+	        
 	        // send response
 	        he.sendResponseHeaders(200, response.length());
 	        OutputStream os = he.getResponseBody();
@@ -191,69 +242,7 @@ public class ServerChat {
 	    }
 	  }
 
-	  public static void main(String[] args) throws Exception {
-
-	    try {
-	      // setup the socket address
-	      InetSocketAddress address = new InetSocketAddress(8090);
-
-	      // initialise the HTTPS server
-	      HttpsServer httpsServer = HttpsServer.create(address, 0);
-	      SSLContext sslContext = SSLContext.getInstance("TLS");
-
-	      // initialise the keystore
-	      char[] password = "password".toCharArray();
-	      KeyStore ks = KeyStore.getInstance("JKS");
-	      FileInputStream fis = new FileInputStream("src/server.jks");
-	      ks.load(fis, password);
-
-	      // setup the key manager factory
-	      KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-	      kmf.init(ks, password);
-
-	      // setup the trust manager factory
-	      TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
-	      tmf.init(ks);
-
-	      // setup the HTTPS context and parameters
-	      sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
-
-
-           
-	      httpsServer.setHttpsConfigurator(new HttpsConfigurator(sslContext) {
-	        public void configure(HttpsParameters params) {
-	          try {
-	            // initialise the SSL context
-	            SSLContext context = getSSLContext();
-	            SSLEngine engine = context.createSSLEngine();
-	            params.setNeedClientAuth(false);
-	            params.setCipherSuites(engine.getEnabledCipherSuites());
-	            params.setProtocols(engine.getEnabledProtocols());
-
-	            // Set the SSL parameters
-	            SSLParameters sslParameters = context.getSupportedSSLParameters();
-	            params.setSSLParameters(sslParameters);
-
-	          } catch (Exception ex) {
-	            System.out.println("Failed to create HTTPS port");
-	          }
-	        }
-	      });
-	      //Map th httphandlers to url
-	      httpsServer.createContext("/inbox", new getMyMessage());
-	      httpsServer.createContext("/list", new listUsers());
-	      httpsServer.createContext("/register", new registerUser());
-	      httpsServer.createContext("/send", new sendMessages());
-	      httpsServer.createContext("/test", new MyHandler());
-	      httpsServer.setExecutor(null); // creates a default executor
-	      httpsServer.start();
-	      System.out.println("server started ");
-	    } catch (Exception exception) {
-	      System.out.println("Failed to create HTTPS server on port " + 8090 + " of localhost");
-	      exception.printStackTrace();
-
-	    }
-	  }
+	 
 	
 	
 
